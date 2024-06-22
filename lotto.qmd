@@ -1,0 +1,59 @@
+---
+title: "lotto"
+format: html
+editor: visual
+---
+
+```{r, warning=FALSE, message=FALSE}
+library(httr)
+library(rvest)
+library(dplyr)
+library(ggplot2)
+
+#get방식 요청, 오류처리
+getNums = function(ball) {
+  url = paste0('https://www.dhlottery.co.kr/gameResult.do?method=byWin&drwNo=', ball)
+  page = tryCatch({
+    GET(url)
+  }, error = function(e) {
+    NULL
+  })
+  
+  if (!is.null(page)) {
+    content = content(page, as = "text")
+    nums = read_html(content) %>%
+      html_nodes('.ball_645') %>%
+      html_text() %>%
+      as.numeric()
+    return(nums)
+  } else {
+    return(rep(NA, 7))
+  }
+}
+
+# 최근 50회차 데이터 크롤링
+new = 1124
+cnt = 50
+
+data = lapply(new:(new - cnt + 1), function(ball) {
+  nums = getNums(ball)
+  return(c(ball, nums))
+})
+
+data = do.call(rbind, data) %>% as.data.frame()
+colnames(data) = c('DrawNo', 'Num1', 'Num2', 'Num3', 'Num4', 'Num5', 'Num6', 'Bonus')
+
+# 로또 번호별 빈도수 계산
+numbers = data[, 2:8] %>% unlist() %>% na.omit()
+num_counts = table(numbers) %>% as.data.frame()
+colnames(num_counts) = c("Number", "times")
+num_counts$Number = as.character(num_counts$Number) %>% as.numeric()
+
+# 막대그래프 생성
+ggplot(num_counts, aes(x = Number, y = times)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  scale_x_continuous(breaks = seq(1, 45, by = 1)) +
+  labs(title = "Lotto Number Analysis",
+       x = "Number",
+       y = "Frequency")
+```
